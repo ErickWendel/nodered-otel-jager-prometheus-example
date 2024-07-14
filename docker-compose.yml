@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  nodered:
+    container_name: nodered-ew
+    image: nodered/node-red:latest-22
+    ports:
+      - 1880:1880
+    volumes:
+      - ./data:/data
+      - ./settings.js:/data/settings.js
+    environment:
+      - TZ=America/Sao_Paulo
+    links:
+      - postgres
+      - otel-collector
+    depends_on:
+      - postgres
+      - otel-collector
+
+  postgres:
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=ewacademy
+      - POSTGRES_USER=erickwendel
+      - POSTGRES_PASSWORD=erick
+      - TZ=America/Sao_Paulo
+      - PGTZ=America/Sao_Paulo
+    ports:
+      - "5432:5432"
+
+  adminer:
+    image: adminer
+    container_name: ewacademy_adminer
+    depends_on:
+      - postgres
+    ports:
+      - "8082:8080"
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    environment:
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR=true
+      - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+      - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268"
+      - "14250"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # http gRPC receiver
+      - "55679:55679" # zpages extension
+    depends_on:
+      - jaeger
+      - prometheus
+    links:
+      - jaeger
+      - prometheus
+
+volumes:
+  nodered_data:
