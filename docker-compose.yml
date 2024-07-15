@@ -79,6 +79,3 @@ services:
     links:
       - jaeger
       - prometheus
-
-volumes:
-  nodered_data:
